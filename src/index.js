@@ -1,4 +1,5 @@
 import path from 'path';
+import findBabelConfig from 'find-babel-config';
 import mapToRelative from './mapToRelative';
 
 function createAliasFileMap(pluginOpts) {
@@ -10,7 +11,7 @@ function createAliasFileMap(pluginOpts) {
     ), {});
 }
 
-export function mapModule(source, file, pluginOpts) {
+export function mapModule(source, file, pluginOpts, cwd) {
     // Do not map source starting with a dot
     if (source[0] === '.') {
         return null;
@@ -23,7 +24,7 @@ export function mapModule(source, file, pluginOpts) {
             // check if the file exists (will throw if not)
             const p = path.resolve(rootDirs[i], source);
             require.resolve(p);
-            return mapToRelative(file, p);
+            return mapToRelative(cwd, file, p);
         } catch (e) {
             // empty...
         }
@@ -49,12 +50,11 @@ export function mapModule(source, file, pluginOpts) {
     }
 
     const newPath = source.replace(moduleSplit.join('/'), aliasPath);
-    return mapToRelative(file, newPath);
+    return mapToRelative(cwd, file, newPath);
 }
 
-
 export default ({ types: t }) => {
-    function transformRequireCall(nodePath, state) {
+    function transformRequireCall(nodePath, state, cwd) {
         if (
             !t.isIdentifier(nodePath.node.callee, { name: 'require' }) &&
                 !(
@@ -67,7 +67,7 @@ export default ({ types: t }) => {
 
         const moduleArg = nodePath.node.arguments[0];
         if (moduleArg && moduleArg.type === 'StringLiteral') {
-            const modulePath = mapModule(moduleArg.value, state.file.opts.filename, state.opts);
+            const modulePath = mapModule(moduleArg.value, state.file.opts.filename, state.opts, cwd);
             if (modulePath) {
                 nodePath.replaceWith(t.callExpression(
                     nodePath.node.callee, [t.stringLiteral(modulePath)]
@@ -76,10 +76,10 @@ export default ({ types: t }) => {
         }
     }
 
-    function transformImportCall(nodePath, state) {
+    function transformImportCall(nodePath, state, cwd) {
         const moduleArg = nodePath.node.source;
         if (moduleArg && moduleArg.type === 'StringLiteral') {
-            const modulePath = mapModule(moduleArg.value, state.file.opts.filename, state.opts);
+            const modulePath = mapModule(moduleArg.value, state.file.opts.filename, state.opts, cwd);
             if (modulePath) {
                 nodePath.replaceWith(t.importDeclaration(
                     nodePath.node.specifiers,
@@ -90,15 +90,26 @@ export default ({ types: t }) => {
     }
 
     return {
+        pre(file) {
+            const startPath = (file.opts.filename === 'unknown')
+                ? './'
+                : file.opts.filename;
+
+            const { file: babelFile } = findBabelConfig.sync(startPath);
+            this.moduleResolverCWD = babelFile
+                ? path.dirname(babelFile)
+                : process.cwd();
+        },
+
         visitor: {
             CallExpression: {
                 exit(nodePath, state) {
-                    return transformRequireCall(nodePath, state);
+                    return transformRequireCall(nodePath, state, this.moduleResolverCWD);
                 }
             },
             ImportDeclaration: {
                 exit(nodePath, state) {
-                    return transformImportCall(nodePath, state);
+                    return transformImportCall(nodePath, state, this.moduleResolverCWD);
                 }
             }
         }

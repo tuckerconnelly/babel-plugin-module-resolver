@@ -1,20 +1,20 @@
 import path from 'path';
 
-function resolve(filename) {
+function resolve(cwd, filename) {
     if (path.isAbsolute(filename)) return filename;
-    return path.resolve(process.cwd(), filename);
+    return path.resolve(cwd, filename);
 }
 
 function toPosixPath(modulePath) {
     return modulePath.replace(/\\/g, '/');
 }
 
-export default function mapToRelative(currentFile, module) {
+export default function mapToRelative(cwd, currentFile, module) {
     let from = path.dirname(currentFile);
     let to = path.normalize(module);
 
-    from = resolve(from);
-    to = resolve(to);
+    from = resolve(cwd, from);
+    to = resolve(cwd, to);
 
     let moduleMapped = path.relative(from, to);
 

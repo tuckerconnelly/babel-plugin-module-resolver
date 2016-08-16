@@ -2,7 +2,7 @@
   "name": "babel-plugin-module-resolver",
   "version": "2.0.0",
   "main": "lib/index.js",
-  "description": "Babel plugin to rewrite the path in require() and ES6 import",
+  "description": "Module resolver plugin for Babel",
   "repository": {
     "type": "git",
     "url": "https://github.com/tleunen/babel-plugin-module-resolver.git"
@@ -57,5 +57,8 @@
       "lcov",
       "text"
     ]
+  },
+  "dependencies": {
+    "find-babel-config": "^1.0.0"
   }
 }
